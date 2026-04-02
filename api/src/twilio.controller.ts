@@ -23,6 +23,13 @@ type TwilioVoiceActionWebhookBody = {
   To?: string;
 };
 
+type TwilioSmsWebhookBody = {
+  MessageSid?: string;
+  From?: string;
+  To?: string;
+  Body?: string;
+};
+
 @ApiTags("twilio")
 @Controller("twilio")
 export class TwilioController {
@@ -92,5 +99,38 @@ export class TwilioController {
     });
 
     return this.twilioService.buildEmptyResponse();
+  }
+
+  @Post("sms")
+  @Header("Content-Type", "text/xml")
+  @ApiOperation({
+    summary: "Handle inbound Twilio SMS webhooks and return an AI-driven reply"
+  })
+  @ApiConsumes("application/x-www-form-urlencoded")
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        MessageSid: { type: "string", example: "SM1234567890abcdef" },
+        From: { type: "string", example: "+15551234567" },
+        To: { type: "string", example: "+15557654321" },
+        Body: { type: "string", example: "Can you text me pricing?" }
+      }
+    }
+  })
+  @ApiOkResponse({
+    schema: {
+      type: "string",
+      example:
+        '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Message>Thanks for reaching out. We can help with that.</Message>\n</Response>'
+    }
+  })
+  async handleSmsWebhook(@Body() body: TwilioSmsWebhookBody): Promise<string> {
+    return this.twilioService.handleInboundSms({
+      messageSid: body.MessageSid,
+      fromPhone: body.From,
+      toPhone: body.To,
+      body: body.Body
+    });
   }
 }

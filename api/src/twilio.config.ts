@@ -5,6 +5,9 @@ export type TwilioConfig = {
   authToken: string;
   twilioPhoneNumber: string;
   recoveryMessage: string;
+  openAiApiKey: string;
+  openAiModel: string;
+  smsSystemPrompt: string;
 };
 
 function requireEnv(name: string): string {
@@ -48,6 +51,16 @@ export function getTwilioConfig(): TwilioConfig {
       requireEnv("TWILIO_PHONE_NUMBER"),
       "TWILIO_PHONE_NUMBER"
     ),
-    recoveryMessage: requireEnv("TWILIO_RECOVERY_MESSAGE")
+    recoveryMessage: requireEnv("TWILIO_RECOVERY_MESSAGE"),
+    openAiApiKey: requireEnv("OPENAI_API_KEY"),
+    openAiModel: process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini",
+    smsSystemPrompt:
+      process.env.TWILIO_SMS_SYSTEM_PROMPT?.trim() ||
+      [
+        "You are an SMS assistant for a business following up on missed calls.",
+        "Keep responses concise, friendly, and action-oriented.",
+        "Acknowledge the caller's message, answer with the available context,",
+        "and suggest a clear next step when appropriate."
+      ].join(" ")
   };
 }

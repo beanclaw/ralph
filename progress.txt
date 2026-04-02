@@ -2,6 +2,7 @@
 - Validate required webhook environment variables in a small config helper and fail fast during Nest provider construction.
 - Keep Twilio controllers thin and build TwiML in services so callback and recovery logic stay testable.
 - Register `express.urlencoded({ extended: false })` in Nest bootstrap before handling Twilio webhooks, because Twilio posts `application/x-www-form-urlencoded` payloads.
+- Preserve SMS thread context in the Twilio service keyed by caller phone number so controllers stay thin and later persistence work can swap the backing store without changing webhook handlers.
 
 # Ralph Progress Log
 Started: Wed Apr  1 23:27:47 EDT 2026
@@ -24,4 +25,14 @@ Started: Wed Apr  1 23:27:47 EDT 2026
   - Patterns discovered: enable `express.urlencoded` in Nest bootstrap before Twilio controllers so form-encoded webhook bodies reach `@Body()` correctly.
   - Gotchas encountered: shared phone normalization helpers should take the env var name so startup validation errors stay accurate when multiple Twilio numbers are configured.
   - Useful context: `TwilioService.handleVoiceAction()` is the current seam for missed-call decisioning, SMS side effects, and correlation logging that later persistence work can build on.
+---
+## 2026-04-01 23:36:04 EDT - US-003
+- Implemented a `POST /twilio/sms` webhook that accepts inbound Twilio SMS payloads and returns a TwiML `<Message>` response.
+- Added OpenAI-backed SMS reply generation through the Responses API, with validated `OPENAI_API_KEY`, configurable `OPENAI_MODEL`, and an overridable `TWILIO_SMS_SYSTEM_PROMPT`.
+- Preserved multi-turn per-lead SMS context in `TwilioService` using an in-memory thread keyed by caller phone number, with structured logging for inbound SMS events.
+- Files changed: `api/src/twilio.config.ts`, `api/src/twilio.controller.ts`, `api/src/twilio.service.ts`, `api/AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Patterns discovered: keep inbound SMS parsing in the controller and conversation state plus AI orchestration in the Twilio service, matching the voice webhook boundary.
+  - Gotchas encountered: OpenAI Responses API replies are easiest to consume by preferring `output_text` and only falling back to output content parsing when needed.
+  - Useful context: the current SMS thread store is intentionally in-memory and keyed by `From`, so US-004 can replace that map with Airtable-backed persistence without changing the webhook contract.
 ---

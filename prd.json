@@ -45,7 +45,7 @@
         "The implementation preserves per-lead conversation context well enough to support multi-turn replies within the same lead thread."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
