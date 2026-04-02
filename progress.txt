@@ -2,7 +2,8 @@
 - Validate required webhook environment variables in a small config helper and fail fast during Nest provider construction.
 - Keep Twilio controllers thin and build TwiML in services so callback and recovery logic stay testable.
 - Register `express.urlencoded({ extended: false })` in Nest bootstrap before handling Twilio webhooks, because Twilio posts `application/x-www-form-urlencoded` payloads.
-- Preserve SMS thread context in the Twilio service keyed by caller phone number so controllers stay thin and later persistence work can swap the backing store without changing webhook handlers.
+- Keep Twilio lead state behind a repository boundary so Airtable and in-memory persistence can share the same webhook-facing service contract.
+- Use `phone:<normalized-number>` as the primary lead key and fall back to `unknown:<sid>` when webhook payloads are missing a caller number.
 
 # Ralph Progress Log
 Started: Wed Apr  1 23:27:47 EDT 2026
@@ -35,4 +36,14 @@ Started: Wed Apr  1 23:27:47 EDT 2026
   - Patterns discovered: keep inbound SMS parsing in the controller and conversation state plus AI orchestration in the Twilio service, matching the voice webhook boundary.
   - Gotchas encountered: OpenAI Responses API replies are easiest to consume by preferring `output_text` and only falling back to output content parsing when needed.
   - Useful context: the current SMS thread store is intentionally in-memory and keyed by `From`, so US-004 can replace that map with Airtable-backed persistence without changing the webhook contract.
+---
+## 2026-04-01 23:41:14 EDT - US-004
+- Implemented a `TwilioLeadRepository` boundary with an Airtable-backed repository plus an in-memory fallback, and wired `TwilioService` to persist voice-action outcomes and SMS thread state through that abstraction.
+- Added optional Airtable environment handling for `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID`, and `AIRTABLE_TABLE_NAME`, with startup validation when only part of the Airtable configuration is provided.
+- Hardened webhook persistence paths so Airtable lookup/write failures emit structured logs without breaking Twilio responses, while lead identity now uses caller phone numbers or a deterministic fallback key.
+- Files changed: `api/src/app.module.ts`, `api/src/twilio.config.ts`, `api/src/twilio.repository.ts`, `api/src/twilio.service.ts`, `api/AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Patterns discovered: keep external system-of-record writes behind a DI token so webhook services stay testable and can swap persistence backends without controller changes.
+  - Gotchas encountered: treat Airtable config as all-or-nothing to avoid partial environment setup that only fails once a webhook arrives.
+  - Useful context: the Airtable repository upserts records by `LeadKey` and stores `ConversationJson` plus append-only `EventLog` text, so later stories can document those field expectations and add tests around them.
 ---

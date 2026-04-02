@@ -60,7 +60,7 @@
         "Failure paths for Airtable writes do not crash the webhook handler without logging or a controlled fallback response."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

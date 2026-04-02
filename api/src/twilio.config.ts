@@ -8,6 +8,11 @@ export type TwilioConfig = {
   openAiApiKey: string;
   openAiModel: string;
   smsSystemPrompt: string;
+  airtable?: {
+    apiKey: string;
+    baseId: string;
+    tableName: string;
+  };
 };
 
 function requireEnv(name: string): string {
@@ -39,6 +44,21 @@ function normalizePhoneNumber(value: string, envName: string): string {
 }
 
 export function getTwilioConfig(): TwilioConfig {
+  const airtableApiKey = process.env.AIRTABLE_API_KEY?.trim();
+  const airtableBaseId = process.env.AIRTABLE_BASE_ID?.trim();
+  const airtableTableName = process.env.AIRTABLE_TABLE_NAME?.trim();
+  const airtableValues = [
+    airtableApiKey,
+    airtableBaseId,
+    airtableTableName
+  ].filter(Boolean);
+
+  if (airtableValues.length > 0 && airtableValues.length < 3) {
+    throw new Error(
+      "AIRTABLE_API_KEY, AIRTABLE_BASE_ID, and AIRTABLE_TABLE_NAME must all be set together"
+    );
+  }
+
   return {
     baseUrl: normalizeBaseUrl(requireEnv("PUBLIC_BASE_URL")),
     forwardToPhone: normalizePhoneNumber(
@@ -61,6 +81,14 @@ export function getTwilioConfig(): TwilioConfig {
         "Keep responses concise, friendly, and action-oriented.",
         "Acknowledge the caller's message, answer with the available context,",
         "and suggest a clear next step when appropriate."
-      ].join(" ")
+      ].join(" "),
+    airtable:
+      airtableValues.length === 3
+        ? {
+            apiKey: airtableApiKey as string,
+            baseId: airtableBaseId as string,
+            tableName: airtableTableName as string
+          }
+        : undefined
   };
 }

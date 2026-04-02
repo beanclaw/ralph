@@ -1,5 +1,13 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { getTwilioConfig, type TwilioConfig } from "./twilio.config";
+import {
+  type InboundSmsPersistencePayload,
+  type LeadIdentity,
+  type SmsConversationTurn,
+  TWILIO_LEAD_REPOSITORY,
+  type TwilioLeadRepository,
+  type VoiceActionPersistencePayload
+} from "./twilio.repository";
 
 type VoiceActionPayload = {
   parentCallSid?: string;
@@ -7,11 +15,6 @@ type VoiceActionPayload = {
   dialCallStatus?: string;
   dialCallDurationSeconds?: number;
   callerPhone?: string;
-};
-
-type SmsConversationTurn = {
-  role: "lead" | "assistant";
-  content: string;
 };
 
 type InboundSmsPayload = {
@@ -37,9 +40,11 @@ type VoiceActionResult = {
 export class TwilioService {
   private readonly config: TwilioConfig;
   private readonly logger = new Logger(TwilioService.name);
-  private readonly smsConversations = new Map<string, SmsConversationTurn[]>();
 
-  constructor() {
+  constructor(
+    @Inject(TWILIO_LEAD_REPOSITORY)
+    private readonly leadRepository: TwilioLeadRepository
+  ) {
     this.config = getTwilioConfig();
   }
 
@@ -60,6 +65,10 @@ export class TwilioService {
 
   async handleVoiceAction(payload: VoiceActionPayload): Promise<VoiceActionResult> {
     const decision = this.getRecoveryDecision(payload);
+    const leadIdentity = this.buildLeadIdentity(
+      payload.callerPhone,
+      payload.parentCallSid ?? payload.dialCallSid
+    );
     const correlation: VoiceActionResult["correlation"] = {
       parentCallSid: payload.parentCallSid ?? null,
       dialCallSid: payload.dialCallSid ?? null,
@@ -81,6 +90,24 @@ export class TwilioService {
       correlation.recoverySmsSent = true;
       correlation.recoverySmsSid = smsSid;
     }
+
+    await this.persistVoiceAction(leadIdentity, {
+      parentCallSid: payload.parentCallSid,
+      dialCallSid: payload.dialCallSid,
+      dialCallStatus: payload.dialCallStatus,
+      dialCallDurationSeconds: payload.dialCallDurationSeconds,
+      dialOutcome: decision.outcome,
+      decisionReason: decision.reason,
+      forwardedToPhone: this.config.forwardToPhone,
+      recoveryMessage: decision.shouldSendRecoverySms
+        ? this.config.recoveryMessage
+        : undefined,
+      recoverySmsSent: Boolean(correlation.recoverySmsSent),
+      recoverySmsSid:
+        typeof correlation.recoverySmsSid === "string"
+          ? correlation.recoverySmsSid
+          : undefined
+    });
 
     this.logger.log(JSON.stringify({ event: "twilio.voice-action", ...correlation }));
 
@@ -110,13 +137,30 @@ export class TwilioService {
       );
     }
 
-    const conversation = this.smsConversations.get(fromPhone) ?? [];
-    conversation.push({ role: "lead", content: inboundBody });
+    const leadIdentity = this.buildLeadIdentity(fromPhone, payload.messageSid);
+    const conversation = await this.getConversation(leadIdentity);
+    const leadTurn: SmsConversationTurn = { role: "lead", content: inboundBody };
+    const leadConversation: SmsConversationTurn[] = [
+      ...conversation,
+      leadTurn
+    ];
 
-    const reply = await this.generateSmsReply(fromPhone, conversation);
+    const reply = await this.generateSmsReply(fromPhone, leadConversation);
+    const assistantTurn: SmsConversationTurn = {
+      role: "assistant",
+      content: reply
+    };
 
-    conversation.push({ role: "assistant", content: reply });
-    this.smsConversations.set(fromPhone, conversation.slice(-10));
+    const updatedConversation = leadConversation.concat(assistantTurn).slice(-10);
+
+    await this.persistInboundSms(leadIdentity, {
+      messageSid: payload.messageSid,
+      fromPhone,
+      toPhone: payload.toPhone,
+      inboundBody,
+      replyBody: reply,
+      conversation: updatedConversation
+    });
 
     this.logger.log(
       JSON.stringify({
@@ -124,7 +168,7 @@ export class TwilioService {
         messageSid: payload.messageSid ?? null,
         fromPhone,
         toPhone: payload.toPhone ?? null,
-        conversationTurnCount: this.smsConversations.get(fromPhone)?.length ?? 0
+        conversationTurnCount: updatedConversation.length
       })
     );
 
@@ -271,6 +315,74 @@ export class TwilioService {
 
     return outputText;
   }
+
+  private buildLeadIdentity(phone?: string, fallbackId?: string): LeadIdentity {
+    const normalizedPhone = phone?.trim();
+
+    if (normalizedPhone) {
+      return {
+        leadKey: `phone:${normalizedPhone}`,
+        phone: normalizedPhone
+      };
+    }
+
+    return {
+      leadKey: `unknown:${fallbackId ?? "twilio-lead"}`
+    };
+  }
+
+  private async getConversation(
+    identity: LeadIdentity
+  ): Promise<SmsConversationTurn[]> {
+    try {
+      return await this.leadRepository.getConversation(identity);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "twilio.persistence.conversation-load-failed",
+          leadKey: identity.leadKey,
+          error: getErrorMessage(error)
+        })
+      );
+
+      return [];
+    }
+  }
+
+  private async persistVoiceAction(
+    identity: LeadIdentity,
+    payload: VoiceActionPersistencePayload
+  ): Promise<void> {
+    try {
+      await this.leadRepository.recordVoiceAction(identity, payload);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "twilio.persistence.voice-action-failed",
+          leadKey: identity.leadKey,
+          error: getErrorMessage(error)
+        })
+      );
+    }
+  }
+
+  private async persistInboundSms(
+    identity: LeadIdentity,
+    payload: InboundSmsPersistencePayload
+  ): Promise<void> {
+    try {
+      await this.leadRepository.saveConversation(identity, payload.conversation);
+      await this.leadRepository.recordInboundSms(identity, payload);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "twilio.persistence.sms-failed",
+          leadKey: identity.leadKey,
+          error: getErrorMessage(error)
+        })
+      );
+    }
+  }
 }
 
 function escapeXml(value: string): string {
@@ -280,4 +392,8 @@ function escapeXml(value: string): string {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll("'", "&apos;");
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
