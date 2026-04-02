@@ -1,6 +1,7 @@
 ## Codebase Patterns
 - Validate required webhook environment variables in a small config helper and fail fast during Nest provider construction.
 - Keep Twilio controllers thin and build TwiML in services so callback and recovery logic stay testable.
+- Register `express.urlencoded({ extended: false })` in Nest bootstrap before handling Twilio webhooks, because Twilio posts `application/x-www-form-urlencoded` payloads.
 
 # Ralph Progress Log
 Started: Wed Apr  1 23:27:47 EDT 2026
@@ -13,4 +14,14 @@ Started: Wed Apr  1 23:27:47 EDT 2026
   - Patterns discovered: keep Twilio webhook XML generation in a service rather than inline in the controller.
   - Gotchas encountered: `npm ci` is required in `api/` before running Nest quality checks because the repo snapshot did not include installed dependencies.
   - Useful context: `PUBLIC_BASE_URL` is used to construct absolute Twilio action callback URLs and `FORWARD_TO_PHONE` is normalized to E.164-style output.
+---
+## 2026-04-01 23:32:43 EDT - US-002
+- Implemented a `POST /twilio/voice-action` webhook that evaluates Twilio dial results, distinguishes connected calls from missed outcomes, and returns an empty TwiML response.
+- Added Twilio recovery SMS delivery through the Twilio REST API using validated `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and `TWILIO_RECOVERY_MESSAGE` environment variables.
+- Recorded structured correlation data for the inbound call, dial attempt, decision outcome, and recovery SMS sid in `TwilioService` logs.
+- Files changed: `api/src/main.ts`, `api/src/twilio.config.ts`, `api/src/twilio.controller.ts`, `api/src/twilio.service.ts`, `api/AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Patterns discovered: enable `express.urlencoded` in Nest bootstrap before Twilio controllers so form-encoded webhook bodies reach `@Body()` correctly.
+  - Gotchas encountered: shared phone normalization helpers should take the env var name so startup validation errors stay accurate when multiple Twilio numbers are configured.
+  - Useful context: `TwilioService.handleVoiceAction()` is the current seam for missed-call decisioning, SMS side effects, and correlation logging that later persistence work can build on.
 ---

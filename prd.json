@@ -30,7 +30,7 @@
         "The implementation records enough structured data to correlate the inbound call, dial attempt, and SMS recovery event for later debugging or CRM sync."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
