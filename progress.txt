@@ -1,0 +1,16 @@
+## Codebase Patterns
+- Validate required webhook environment variables in a small config helper and fail fast during Nest provider construction.
+- Keep Twilio controllers thin and build TwiML in services so callback and recovery logic stay testable.
+
+# Ralph Progress Log
+Started: Wed Apr  1 23:27:47 EDT 2026
+---
+## 2026-04-01 23:29:16 EDT - US-001
+- Implemented a `POST /twilio/voice` Nest endpoint that returns TwiML to dial the configured business number and register a `POST /twilio/voice-action` callback.
+- Added Twilio voice configuration validation for `PUBLIC_BASE_URL` and `FORWARD_TO_PHONE`, with startup-time failure through the Twilio service constructor.
+- Files changed: `api/src/app.module.ts`, `api/src/main.ts`, `api/src/twilio.config.ts`, `api/src/twilio.controller.ts`, `api/src/twilio.service.ts`, `api/AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Patterns discovered: keep Twilio webhook XML generation in a service rather than inline in the controller.
+  - Gotchas encountered: `npm ci` is required in `api/` before running Nest quality checks because the repo snapshot did not include installed dependencies.
+  - Useful context: `PUBLIC_BASE_URL` is used to construct absolute Twilio action callback URLs and `FORWARD_TO_PHONE` is normalized to E.164-style output.
+---

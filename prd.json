@@ -1,0 +1,83 @@
+{
+  "project": "lead-recovery-lab",
+  "branchName": "feature/twilio-missed-call-recovery-api",
+  "description": "Implement the Twilio missed-call recovery flow described in twilio.md inside the lead-recovery-lab-api repo, including inbound voice handling, missed-call detection, SMS recovery, AI-driven SMS conversation handling, and operational persistence boundaries for lead tracking.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement inbound Twilio voice webhook",
+      "description": "As the system, I need a /twilio/voice endpoint that receives inbound Twilio voice webhooks and returns valid TwiML to forward the caller to the configured business phone number while registering an action callback for the final dial result.",
+      "acceptanceCriteria": [
+        "A POST endpoint exists for /twilio/voice in the API repo.",
+        "The endpoint returns valid TwiML that attempts to dial FORWARD_TO_PHONE.",
+        "The dial instruction includes an action callback to /twilio/voice-action.",
+        "Required Twilio configuration is loaded from environment variables and validated at startup or module init.",
+        "A request from Twilio that reaches the endpoint can progress into the voice-action step without manual intervention."
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Detect missed calls and trigger recovery SMS",
+      "description": "As the system, I need a /twilio/voice-action endpoint that inspects the Twilio dial result, determines whether the business missed the call, and sends an automated recovery SMS to the original caller when recovery criteria are met.",
+      "acceptanceCriteria": [
+        "A POST endpoint exists for /twilio/voice-action in the API repo.",
+        "The endpoint reads the Twilio dial outcome and distinguishes connected calls from missed or unanswered calls.",
+        "When the call is considered missed, the system sends an SMS from TWILIO_PHONE_NUMBER to the caller using a configurable recovery message.",
+        "When the call is successfully connected, the system does not send a recovery SMS.",
+        "The implementation records enough structured data to correlate the inbound call, dial attempt, and SMS recovery event for later debugging or CRM sync."
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Handle inbound SMS conversation replies",
+      "description": "As a recovered lead, I want to reply by SMS and receive a coherent automated response so that I can continue the conversation after a missed call without waiting for a human to manually respond.",
+      "acceptanceCriteria": [
+        "A POST endpoint exists for /twilio/sms in the API repo.",
+        "The endpoint accepts inbound SMS webhooks from Twilio and extracts the sender phone number and message body.",
+        "The service generates an AI-driven SMS response using OPENAI_API_KEY-backed logic or a well-defined integration seam for that logic.",
+        "The endpoint returns TwiML or sends an outbound reply in the format Twilio expects for SMS webhook handling.",
+        "The implementation preserves per-lead conversation context well enough to support multi-turn replies within the same lead thread."
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Persist lead and conversation state for operations",
+      "description": "As an operator, I need Twilio recovery events and lead conversation state written to the system of record so that missed-call recovery outcomes can be tracked, audited, and routed into booking follow-up workflows.",
+      "acceptanceCriteria": [
+        "The implementation defines how Airtable credentials and target table settings are consumed from environment variables.",
+        "A new inbound call can be associated with a lead record keyed by caller phone number or another deterministic identifier.",
+        "Missed-call recovery SMS sends and inbound SMS replies are persisted or synchronized to the configured Airtable table, or a documented repository abstraction is added with a working implementation stub if full Airtable wiring is intentionally deferred.",
+        "The code distinguishes core Twilio flow logic from persistence integrations so the webhook path remains testable.",
+        "Failure paths for Airtable writes do not crash the webhook handler without logging or a controlled fallback response."
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Cover the Twilio recovery flow with configuration and tests",
+      "description": "As a developer, I need the Twilio missed-call recovery flow to be documented and tested so that the API implementation can be deployed and iterated safely.",
+      "acceptanceCriteria": [
+        "The repo includes clear setup documentation for required Twilio, OpenAI, Airtable, forwarding, and booking environment variables.",
+        "Automated tests cover the main branches of the webhook flow: successful call connection, missed-call SMS trigger, and inbound SMS handling.",
+        "The tests verify TwiML generation and missed-call decision logic without requiring live Twilio credentials.",
+        "Any assumptions that are still unresolved from twilio.md are captured explicitly in implementation notes or TODOs.",
+        "A developer can identify the controller, service, and integration boundaries for the Twilio flow from the final implementation structure."
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    }
+  ],
+  "repo": "lead-recovery-lab-api"
+}

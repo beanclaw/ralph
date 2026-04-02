@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "templateName": "template-nestjs-api-swagger",
+  "description": "Single-container NestJS API with Swagger support.",
+  "services": {
+    "web": {
+      "enabled": true,
+      "port": 3000,
+      "dockerImageSuffix": "-web",
+      "traefik": {
+        "enabled": true,
+        "defaultHostPattern": "{slug}.maxlongton.com",
+        "entrypoints": ["websecure"],
+        "tls": true,
+        "certResolver": "letsencrypt"
+      }
+    },
+    "api": {
+      "enabled": false
+    },
+    "db": {
+      "enabled": false
+    }
+  },
+  "database": {
+    "required": false,
+    "migrationCommand": null
+  },
+  "environment": {
+    "requiredVariables": [],
+    "optionalVariables": [],
+    "prefixStrategy": "uppercase_slug_with_underscores"
+  },
+  "github": {
+    "requiredSecrets": [
+      "APP_NAME",
+      "VPS_HOST",
+      "VPS_USER",
+      "VPS_SSH_KEY",
+      "INFRA_PATH"
+    ],
+    "imageTagStrategy": "ghcr.io/{owner}/{repo}-web:sha-{shortsha}"
+  },
+  "deploy": {
+    "webOnly": true,
+    "requiresApiContainer": false,
+    "requiresDbContainer": false,
+    "runMigrations": false
+  },
+  "bootstrap": {
+    "createInfraAppFile": true,
+    "autoGenerateEnvFile": true,
+    "initialDeployOnMainPush": true
+  }
+}
