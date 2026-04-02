@@ -4,6 +4,7 @@
 - Register `express.urlencoded({ extended: false })` in Nest bootstrap before handling Twilio webhooks, because Twilio posts `application/x-www-form-urlencoded` payloads.
 - Keep Twilio lead state behind a repository boundary so Airtable and in-memory persistence can share the same webhook-facing service contract.
 - Use `phone:<normalized-number>` as the primary lead key and fall back to `unknown:<sid>` when webhook payloads are missing a caller number.
+- Prefer `TwilioService` unit tests with the in-memory repository and mocked `global.fetch`; this covers TwiML, recovery decisions, and SMS threading without live Twilio/OpenAI credentials.
 
 # Ralph Progress Log
 Started: Wed Apr  1 23:27:47 EDT 2026
@@ -46,4 +47,13 @@ Started: Wed Apr  1 23:27:47 EDT 2026
   - Patterns discovered: keep external system-of-record writes behind a DI token so webhook services stay testable and can swap persistence backends without controller changes.
   - Gotchas encountered: treat Airtable config as all-or-nothing to avoid partial environment setup that only fails once a webhook arrives.
   - Useful context: the Airtable repository upserts records by `LeadKey` and stores `ConversationJson` plus append-only `EventLog` text, so later stories can document those field expectations and add tests around them.
+---
+## 2026-04-01 23:45:00 EDT - US-005
+- Added Jest-based unit coverage for `TwilioService`, covering voice TwiML generation, connected-vs-missed call handling, recovery SMS triggering, and multi-turn inbound SMS replies with mocked network calls.
+- Replaced the placeholder README with setup, environment, Airtable schema, test coverage, implementation boundary, and open-assumption documentation for the Twilio recovery flow.
+- Files changed: `README.md`, `api/AGENTS.md`, `api/jest.config.js`, `api/package-lock.json`, `api/package.json`, `api/src/twilio.service.spec.ts`, `api/tsconfig.spec.json`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Patterns discovered: keep Twilio flow tests at the service layer and use the in-memory repository plus mocked `global.fetch` for deterministic coverage.
+  - Gotchas encountered: Jest globals need a dedicated `tsconfig.spec.json` because the main Nest tsconfig only includes `node` types.
+  - Useful context: the root `README.md` now documents required env vars, Airtable field expectations, webhook URLs, and the explicit assumptions made because `twilio.md` is not present in this repo snapshot.
 ---

@@ -75,7 +75,7 @@
         "A developer can identify the controller, service, and integration boundaries for the Twilio flow from the final implementation structure."
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": ""
     }
   ],

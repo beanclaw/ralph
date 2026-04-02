@@ -6,3 +6,4 @@
 - Preserve per-lead SMS conversation state behind the service boundary keyed by normalized sender phone numbers, so webhook controllers remain stateless and persistence can replace the in-memory store later.
 - Keep Twilio lead persistence behind a repository token; use `phone:<E164>` as the primary lead key and fall back to a deterministic `unknown:<sid>` key when a caller number is missing.
 - Treat Airtable as optional infrastructure: require `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID`, and `AIRTABLE_TABLE_NAME` together, and swallow write failures with structured logs so webhooks still return TwiML.
+- Prefer `TwilioService` unit tests with the in-memory repository and mocked `global.fetch`; that covers TwiML, recovery decisions, and SMS threading without booting Nest or using live Twilio/OpenAI credentials.
